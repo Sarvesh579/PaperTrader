@@ -65,6 +65,7 @@ class SystemState(Base):
     current_strategy = Column(String)
     interval_minutes = Column(Integer)
     initial_capital = Column(Float)
+    cash_balance = Column(Float)
     last_heartbeat = Column(DateTime, default=datetime.utcnow)
 
 

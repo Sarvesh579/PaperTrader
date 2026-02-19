@@ -1,14 +1,38 @@
 import yfinance as yf
 import pandas as pd
 from datetime import datetime
-from db import SessionLocal, Trade, Position, EquityHistory
-from config import INITIAL_CAPITAL, BROKERAGE_RATE, DEFAULT_SYMBOL, DEFAULT_QUANTITY
+from db import SessionLocal, Trade, Position, EquityHistory, SystemState
+from config import INITIAL_CAPITAL, BROKERAGE_RATE, DEFAULT_SYMBOL
+from strategies import AVAILABLE_STRATEGIES
 
+def get_or_create_system_state():
+        db = SessionLocal()
+        state = db.query(SystemState).first()
+
+        if not state:
+            state = SystemState(
+                is_running=False,
+                current_strategy="random",
+                interval_minutes=5,
+                initial_capital=INITIAL_CAPITAL,
+                cash_balance=INITIAL_CAPITAL,
+            )
+            db.add(state)
+            db.commit()
+            db.refresh(state)
+
+        db.close()
+        return state
 
 class PaperTrader:
-    def __init__(self):
-        self.cash = INITIAL_CAPITAL
+    def __init__(self, strategy_name="random"):
+        state = get_or_create_system_state()
+
         self.symbol = DEFAULT_SYMBOL
+        self.strategy_name = strategy_name
+        self.strategy = AVAILABLE_STRATEGIES[strategy_name]()
+        self.cash = state.cash_balance
+
 
     # --------------------------
     # Fetch Latest Price
@@ -38,6 +62,7 @@ class PaperTrader:
         brokerage = trade_value * BROKERAGE_RATE
 
         position = db.query(Position).filter(Position.symbol == self.symbol).first()
+        state = db.query(SystemState).first()
 
         if side == "BUY":
             total_cost = trade_value + brokerage
@@ -88,9 +113,13 @@ class PaperTrader:
                 )
             )
 
+        # ✅ ALWAYS update DB cash
+        state.cash_balance = self.cash
+
         db.commit()
         db.close()
         return "Order Executed"
+
 
     # --------------------------
     # Update Equity Snapshot
@@ -125,12 +154,19 @@ class PaperTrader:
         if not price:
             return "Price fetch failed"
 
-        # Simple dummy logic:
-        # Alternate BUY / SELL based on second
-        if datetime.utcnow().second % 2 == 0:
-            result = self.execute_order("BUY", DEFAULT_QUANTITY, price)
+        db = SessionLocal()
+        position = db.query(Position).filter(Position.symbol == self.symbol).first()
+        db.close()
+
+        signal = self.strategy.generate_signal(price, position)
+
+        action = signal["action"]
+        quantity = signal["quantity"]
+
+        if action in ["BUY", "SELL"] and quantity > 0:
+            result = self.execute_order(action, quantity, price)
         else:
-            result = self.execute_order("SELL", DEFAULT_QUANTITY, price)
+            result = "No Trade"
 
         self.update_equity()
         return result
