@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual Environments
+env/
+venv/
+papertrader/
+.venv/
+
+# SQLite DB
+*.db
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# FastAPI cache
+*.sqlite3
+
+# Node (future dashboard)
+node_modules/
+dist/
+build/
