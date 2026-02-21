@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from trader import PaperTrader
 from scheduler import scheduler, start_scheduler, stop_scheduler, update_interval
 from db import SessionLocal, SystemState, Position, Trade, EquityHistory
@@ -6,7 +7,19 @@ from config import INITIAL_CAPITAL
 
 
 app = FastAPI()
-trader = PaperTrader("random") # You can choose different strategies here
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+db = SessionLocal()
+state = db.query(SystemState).first()
+db.close()
+
+initial_strategy = state.current_strategy if state else "random"
+trader = PaperTrader(initial_strategy)
 
 @app.on_event("startup")
 def resume_if_running():
@@ -32,9 +45,21 @@ def status():
         "cash": state.cash_balance if state else None,
         "is_running": state.is_running if state else False,
         "interval_minutes": state.interval_minutes if state else None,
+        "current_strategy": state.current_strategy if state else None,
         "last_heartbeat": str(state.last_heartbeat) if state else None
     }
     return response
+
+
+@app.get("/strategy")
+def get_strategy():
+    db = SessionLocal()
+    state = db.query(SystemState).first()
+    db.close()
+
+    return {
+        "current_strategy": state.current_strategy if state else None
+    }
 
 
 @app.get("/portfolio")
@@ -95,6 +120,25 @@ def equity():
     return data
 
 
+@app.get("/refresh_prices")
+def refresh_prices():
+    db = SessionLocal()
+
+    positions = db.query(Position).all()
+
+    for pos in positions:
+        # Fetch latest price
+        price = trader.fetch_price()
+
+        pos.current_price = price
+        pos.unrealized_pnl = (price - pos.avg_price) * pos.quantity
+
+    db.commit()
+    db.close()
+
+    return {"message": "Prices refreshed"}
+
+
 @app.post("/start")
 def start():
     start_scheduler(trader)
@@ -144,7 +188,6 @@ def set_cash(amount: float):
 def set_strategy(strategy_name: str):
     global trader
 
-    # Stop scheduler if running
     stop_scheduler()
 
     db = SessionLocal()

@@ -73,28 +73,50 @@ class PaperTrader:
 
             self.cash -= total_cost
 
+            # Effective buy price includes brokerage
+            effective_price = total_cost / quantity
+
             if position:
                 new_qty = position.quantity + quantity
-                new_avg = ((position.avg_price * position.quantity) + trade_value) / new_qty
+                new_avg = (
+                    (position.avg_price * position.quantity) + total_cost
+                ) / new_qty
                 position.quantity = new_qty
                 position.avg_price = new_avg
             else:
                 position = Position(
                     symbol=self.symbol,
                     quantity=quantity,
-                    avg_price=price,
+                    avg_price=effective_price,
                     current_price=price,
                     unrealized_pnl=0,
                 )
                 db.add(position)
+
+            # Log BUY trade (realized_pnl = 0)
+            db.add(
+                Trade(
+                    symbol=self.symbol,
+                    side="BUY",
+                    quantity=quantity,
+                    price=price,
+                    brokerage=brokerage,
+                    total_value=trade_value,
+                    realized_pnl=0,
+                )
+            )
 
         elif side == "SELL":
             if not position or position.quantity < quantity:
                 db.close()
                 return "Not enough shares"
 
-            self.cash += trade_value - brokerage
-            realized_pnl = (price - position.avg_price) * quantity
+            # Revenue after brokerage
+            net_revenue = trade_value - brokerage
+            self.cash += net_revenue
+
+            # True realized PnL includes buy brokerage via avg_price
+            realized_pnl = (price - position.avg_price) * quantity - brokerage
 
             position.quantity -= quantity
 
@@ -113,13 +135,12 @@ class PaperTrader:
                 )
             )
 
-        # ✅ ALWAYS update DB cash
+        # Persist updated cash
         state.cash_balance = self.cash
 
         db.commit()
         db.close()
         return "Order Executed"
-
 
     # --------------------------
     # Update Equity Snapshot
@@ -132,6 +153,7 @@ class PaperTrader:
 
         for pos in positions:
             portfolio_value += pos.quantity * pos.current_price
+            pos.unrealized_pnl = (pos.current_price - pos.avg_price) * pos.quantity
 
         total_equity = self.cash + portfolio_value
 
