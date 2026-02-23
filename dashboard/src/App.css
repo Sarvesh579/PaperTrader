@@ -1,42 +1,100 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+body {
+  margin: 0;
+  background: #101010;
+  font-family: Arial, sans-serif;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+.app-container {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.left-column {
+  flex: 2;
+
+  padding: 20px;
+  overflow-y: auto;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
+.right-column {
+  flex: 1;
+  padding: 20px;
+  background: #101010;
+  border-left: 2px solid #888888;
+  overflow-y: auto;
 }
 
-.card {
-  padding: 2em;
+.section {
+  background: #101010;
+  padding: 7px;
+  margin-bottom: 10px;
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
 }
 
-.read-the-docs {
-  color: #888;
+h2 {
+  margin-top: 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+
+table th {
+  background: #122542;
+  text-align: left;
+  padding: 8px;
+}
+
+table td {
+  background: transparent;
+  padding: 8px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.pnl-positive {
+  color: green;
+  font-weight: bold;
+}
+
+.pnl-negative {
+  color: red;
+  font-weight: bold;
+}
+
+button {
+  margin: 5px 5px 5px 0;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 5px;
+  background: #888;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #555;
+}
+
+button.active {
+  background: #4CAF50;
+  color: white;
+}
+
+button.active:hover {
+  background: #265828;
+}
+
+input {
+  padding: 6px;
+  margin-right: 8px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+}
+
+.trade-scroll {
+  max-height: 200px;
+  overflow-y: auto;
 }

@@ -12,7 +12,7 @@ import {
   setStrategy,
   setInterval
 } from "./api";
-
+import "./App.css";
 import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 
 function App() {
@@ -37,24 +37,16 @@ function App() {
 
   useEffect(() => {
     let isMounted = true;
-
     const poll = async () => {
       if (!isMounted) return;
       await refresh();
       setTimeout(poll, 3000); // refresh every 3 seconds
     };
-
     poll();
-
     return () => {
       isMounted = false;
     };
   }, []);
-
-  const activeStyle = {
-    backgroundColor: "#4CAF50",
-    color: "white"
-  };
 
   const totalUnrealized = portfolio.reduce(
     (sum, p) => sum + (p.unrealized_pnl || 0),
@@ -66,200 +58,185 @@ function App() {
     0
   );
 
+  const pnlPercent =
+    status.cash
+      ? ((totalUnrealized + totalRealized) / status.cash) * 100
+      : 0;
+
   return (
-    <div style={{ padding: 20, fontFamily: "Arial" }}>
-      <h1>PaperTrader Dashboard</h1>
+    <div className="app-container">
+      {/* LEFT COLUMN */}
+      <div className="left-column">
+        <h1>PaperTrader</h1>
+        
+        <div className="section">
+          <h2>
+            Portfolio — 
+            <span className={totalUnrealized >= 0 ? "pnl-positive" : "pnl-negative"}>
+              ₹{totalUnrealized.toFixed(2)}
+            </span>
+          </h2>
 
-      <h2>Status</h2>
-      <p><b>Cash:</b> ₹{status.cash}</p>
-      <p><b>Running:</b> {String(status.is_running)}</p>
-      <p><b>Interval:</b> {status.interval_minutes} min</p>
+          <table>
+            <thead>
+              <tr>
+                <th>Symbol</th>
+                <th>Qty</th>
+                <th>Avg</th>
+                <th>Current</th>
+                <th>PnL</th>
+              </tr>
+            </thead>
+            <tbody>
+              {portfolio.map((p, i) => (
+                <tr key={i}>
+                  <td>{p.symbol}</td>
+                  <td>{p.quantity}</td>
+                  <td>{p.avg_price?.toFixed(2)}</td>
+                  <td>{p.current_price?.toFixed(2)}</td>
+                  <td className={ p.unrealized_pnl >= 0 ? "pnl-positive" : "pnl-negative"}>
+                    {p.unrealized_pnl?.toFixed(2)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        
+        <div className="section">
+          <h2 style={{ marginTop: 30 }}>
+            Trades — 
+            <span className={totalRealized >= 0 ? "pnl-positive" : "pnl-negative"}>
+              ₹{totalRealized.toFixed(2)}
+            </span>
+          </h2>
 
-      <div>
+        {/* Scrollable older trades */}
+        <div className="trade-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Side</th>
+                <th>Qty</th>
+                <th>Price</th>
+                <th>PnL</th>
+              </tr>
+            </thead>
+            <tbody>
+              { trades.map((t, i) => (
+                <tr key={i}>
+                  <td>{new Date(t.timestamp).toLocaleTimeString()}</td>
+                  <td>{t.side}</td>
+                  <td>{t.quantity}</td>
+                  <td>{t.price?.toFixed(2)}</td>
+                  <td className={t.realized_pnl >= 0  ? "pnl-positive" : "pnl-negative"}>
+                    {t.realized_pnl?.toFixed(2)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      </div>
+
+      {/* RIGHT COLUMN */}
+      <div className="right-column">
+        <h2>Controls</h2>
+
+        <p><b>Cash:</b> ₹{status.cash}</p>
+        <p>
+          <b>PnL %:</b>{" "}
+          <span className={ pnlPercent >= 0 ? "pnl-positive" : "pnl-negative"}>
+            {pnlPercent.toFixed(2)}%
+          </span>
+        </p>
+
         <button
-          onClick={async () => {
-            await startTrading();
-            await refresh();
-          }}
-          style={status.is_running ? activeStyle : {}}
+          onClick={async () => { await startTrading(); refresh(); }}
+          className={status.is_running ? "active" : ""}
         >
           Start
         </button>
 
         <button
-          onClick={async () => {
-            await stopTrading();
-            await refresh();
-          }}
-          style={!status.is_running ? activeStyle : {}}
+          onClick={async () => { await stopTrading(); refresh(); }}
+          className={!status.is_running ? "active" : ""}
         >
           Stop
         </button>
 
-        <button
-          onClick={async () => {
-            await resetAccount();
-            await refresh();
-          }}
-        >
+        <button onClick={async () => { await resetAccount(); refresh(); }}>
           Reset
         </button>
-      </div>
 
-      <hr />
+        <hr />
 
-      <h2>Set Cash</h2>
-      <input
-        type="number"
-        placeholder="Enter amount"
-        value={cashInput}
-        onChange={(e) => setCashInput(e.target.value)}
-      />
-      <button
-        onClick={async () => {
-          if (cashInput) {
+        <input
+          type="number"
+          placeholder="Set Cash"
+          value={cashInput}
+          onChange={(e) => setCashInput(e.target.value)}
+        />
+        <button
+          onClick={async () => {
             await setCash(Number(cashInput));
             setCashInput("");
-            await refresh();
-          }
-        }}
-      >
-        Update
-      </button>
+            refresh();
+          }}
+        >
+          Update
+        </button>
 
-      <hr />
+        <hr />
 
-      <h2>Strategy</h2>
-      <button
-        onClick={async () => {
-          await setStrategy("random");
-          await refresh();
-        }}
-        style={status.current_strategy === "random" ? activeStyle : {}}
-      >
-        Random
-      </button>
+        <button
+          onClick={async () => { await setStrategy("random"); refresh(); }}
+          className={status.current_strategy === "random" ? "active" : ""}
+        >
+          Random
+        </button>
 
-      <button
-        onClick={async () => {
-          await setStrategy("momentum");
-          await refresh();
-        }}
-        style={status.current_strategy === "momentum" ? activeStyle : {}}
-      >
-        Momentum
-      </button>
+        <button
+          onClick={async () => { await setStrategy("momentum"); refresh(); }}
+          className={status.current_strategy === "momentum" ? "active" : ""}
+        >
+          Momentum
+        </button>
 
-      <hr />
+        <hr />
 
-      <h2>Interval</h2>
-      <button
-        onClick={async () => {
-          await setInterval(1);
-          await refresh();
-        }}
-        style={status.interval_minutes === 1 ? activeStyle : {}}
-      >
-        1 Min
-      </button>
+        <button
+          onClick={async () => { await setInterval(1); refresh(); }}
+          className={status.interval_minutes === 1 ? "active" : ""}
+        >
+          1 Min
+        </button>
 
-      <button
-        onClick={async () => {
-          await setInterval(5);
-          await refresh();
-        }}
-        style={status.interval_minutes === 5 ? activeStyle : {}}
-      >
-        5 Min
-      </button>
+        <button
+          onClick={async () => { await setInterval(5); refresh(); }}
+          className={status.interval_minutes === 5 ? "active" : ""}
+        >
+          5 Min
+        </button>
 
-      <hr />
+        <hr />
 
-      <h2>Equity Curve</h2>
-      <LineChart width={800} height={300} data={equity}>
-        <CartesianGrid stroke="#ccc" />
-        <XAxis dataKey="timestamp" hide />
-        <YAxis />
-        <Tooltip />
-        <Line type="monotone" dataKey="total_equity" stroke="#8884d8" />
-      </LineChart>
-
-      <hr />
-
-      <h2>
-        Portfolio — 
-        <span style={{ color: totalUnrealized >= 0 ? "green" : "red" }}>
-          ₹{totalUnrealized.toFixed(2)}
-        </span>
-      </h2>
-      <table border="1" cellPadding="8">
-        <thead>
-          <tr>
-            <th>Symbol</th>
-            <th>Quantity</th>
-            <th>Avg Price</th>
-            <th>Current Price</th>
-            <th>Unrealized PnL</th>
-          </tr>
-        </thead>
-        <tbody>
-          {portfolio.map((p, index) => (
-            <tr key={index}>
-              <td>{p.symbol}</td>
-              <td>{p.quantity}</td>
-              <td>{p.avg_price?.toFixed(2)}</td>
-              <td>{p.current_price?.toFixed(2)}</td>
-              <td
-                style={{
-                  color: p.unrealized_pnl >= 0 ? "green" : "red"
-                }}
-              >
-                {p.unrealized_pnl?.toFixed(2)}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <hr />
-
-      <h2>
-        Trades —  
-        <span style={{ color: totalRealized >= 0 ? "green" : "red" }}>
-          ₹{totalRealized.toFixed(2)}
-        </span>
-      </h2>
-      <table border="1" cellPadding="8">
-        <thead>
-          <tr>
-            <th>Time</th>
-            <th>Symbol</th>
-            <th>Side</th>
-            <th>Qty</th>
-            <th>Price</th>
-            <th>Realized PnL</th>
-          </tr>
-        </thead>
-        <tbody>
-          {trades.map((t, index) => (
-            <tr key={index}>
-              <td>{new Date(t.timestamp).toLocaleTimeString()}</td>
-              <td>{t.symbol}</td>
-              <td style={{ color: t.side === "BUY" ? "green" : "red" }}>
-                {t.side}
-              </td>
-              <td>{t.quantity}</td>
-              <td>{t.price?.toFixed(2)}</td>
-              <td
-                style={{
-                  color: t.realized_pnl >= 0 ? "green" : "red"
-                }}
-              >
-                {t.realized_pnl?.toFixed(2)}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+        <h3>Equity Curve</h3>
+        <LineChart width={400} height={200} data={equity}>
+          <CartesianGrid stroke="#666" />
+          <XAxis
+            dataKey="timestamp"
+            tickFormatter={(t) =>
+              new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+            }
+          />
+          <YAxis />
+          <Tooltip />
+          <Line type="monotone" dataKey="total_equity" stroke="#8884d8" />
+        </LineChart>
+      </div>
     </div>
   );
 }

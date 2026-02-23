@@ -4,7 +4,15 @@ from trader import PaperTrader
 from scheduler import scheduler, start_scheduler, stop_scheduler, update_interval
 from db import SessionLocal, SystemState, Position, Trade, EquityHistory
 from config import INITIAL_CAPITAL
+from datetime import datetime, timedelta
+from sqlalchemy import and_
+from zoneinfo import ZoneInfo
 
+IST = ZoneInfo("Asia/Kolkata")
+def to_ist(dt):
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=ZoneInfo("UTC")).astimezone(IST)
+    return dt.astimezone(IST)
 
 app = FastAPI()
 app.add_middleware(
@@ -46,7 +54,7 @@ def status():
         "is_running": state.is_running if state else False,
         "interval_minutes": state.interval_minutes if state else None,
         "current_strategy": state.current_strategy if state else None,
-        "last_heartbeat": str(state.last_heartbeat) if state else None
+        "last_heartbeat": to_ist(state.last_heartbeat).isoformat()
     }
     return response
 
@@ -56,7 +64,6 @@ def get_strategy():
     db = SessionLocal()
     state = db.query(SystemState).first()
     db.close()
-
     return {
         "current_strategy": state.current_strategy if state else None
     }
@@ -66,7 +73,6 @@ def get_strategy():
 def portfolio():
     db = SessionLocal()
     positions = db.query(Position).all()
-
     data = [
         {
             "symbol": p.symbol,
@@ -77,7 +83,6 @@ def portfolio():
         }
         for p in positions
     ]
-
     db.close()
     return data
 
@@ -86,10 +91,9 @@ def portfolio():
 def trades():
     db = SessionLocal()
     trades = db.query(Trade).order_by(Trade.timestamp.desc()).all()
-
     data = [
         {
-            "timestamp": str(t.timestamp),
+            "timestamp": to_ist(t.timestamp).isoformat(),
             "symbol": t.symbol,
             "side": t.side,
             "quantity": t.quantity,
@@ -98,7 +102,6 @@ def trades():
         }
         for t in trades
     ]
-
     db.close()
     return data
 
@@ -106,36 +109,54 @@ def trades():
 @app.get("/equity")
 def equity():
     db = SessionLocal()
-    history = db.query(EquityHistory).order_by(EquityHistory.timestamp.asc()).all()
+    now = datetime.now(ZoneInfo("Asia/Kolkata"))
+    last_24h = now - timedelta(hours=24)
 
-    data = [
-        {
-            "timestamp": str(h.timestamp),
-            "total_equity": h.total_equity
-        }
-        for h in history
-    ]
-
+    history = (
+        db.query(EquityHistory)
+        .filter(EquityHistory.timestamp >= last_24h)
+        .order_by(EquityHistory.timestamp.asc())
+        .all()
+    )
     db.close()
-    return data
+
+    if len(history) <= 20:
+        return [{
+            "timestamp" : to_ist(h.timestamp).isoformat(),
+            "total_equity": h.total_equity
+            }
+        for h in history
+        ]
+    condensed = []
+    bucket = None
+    current_bucket_time = None
+    for h in history:
+        bucket_time = h.timestamp.replace(
+            minute=(h.timestamp.minute // 15) * 15,
+            second=0,
+            microsecond=0
+        )
+        if current_bucket_time != bucket_time:
+            condensed.append({
+                "timestamp": to_ist(bucket_time).isoformat(),
+                "total_equity": h.total_equity
+            })
+            current_bucket_time = bucket_time
+    return condensed
 
 
 @app.get("/refresh_prices")
 def refresh_prices():
     db = SessionLocal()
-
     positions = db.query(Position).all()
 
     for pos in positions:
-        # Fetch latest price
         price = trader.fetch_price()
-
         pos.current_price = price
         pos.unrealized_pnl = (price - pos.avg_price) * pos.quantity
 
     db.commit()
     db.close()
-
     return {"message": "Prices refreshed"}
 
 

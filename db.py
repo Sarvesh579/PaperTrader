@@ -1,6 +1,7 @@
 from sqlalchemy import create_engine, Column, Integer, Float, String, Boolean, DateTime
 from sqlalchemy.orm import declarative_base, sessionmaker
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 DATABASE_URL = "sqlite:///database.db"
 
@@ -48,7 +49,7 @@ class EquityHistory(Base):
     __tablename__ = "equity_history"
 
     id = Column(Integer, primary_key=True, index=True)
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime, default=lambda: datetime.now(ZoneInfo("Asia/Kolkata")))
     cash_balance = Column(Float)
     portfolio_value = Column(Float)
     total_equity = Column(Float)
