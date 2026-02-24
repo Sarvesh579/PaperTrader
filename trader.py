@@ -38,18 +38,28 @@ class PaperTrader:
     # Fetch Latest Price
     # --------------------------
     def fetch_price(self):
-        data = yf.download(self.symbol, period="1d", interval="1m", progress=False)
+        try:
+            data = yf.download(
+                self.symbol,
+                period="1d",
+                interval="1m",
+                progress=False,
+                threads=False
+            )
 
-        if data.empty:
+            if data.empty:
+                return None
+
+            if isinstance(data.columns, pd.MultiIndex):
+                price = data["Close"][self.symbol].iloc[-1]
+            else:
+                price = data["Close"].iloc[-1]
+
+            return float(price)
+
+        except Exception as e:
+            print("Price fetch error:", e)
             return None
-
-        # Proper MultiIndex check
-        if isinstance(data.columns, pd.MultiIndex):
-            price = data["Close"][self.symbol].iloc[-1]
-        else:
-            price = data["Close"].iloc[-1]
-
-        return float(price)
 
 
     # --------------------------

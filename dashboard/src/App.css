@@ -12,7 +12,6 @@ body {
 
 .left-column {
   flex: 2;
-
   padding: 20px;
   overflow-y: auto;
 }

@@ -149,15 +149,18 @@ def equity():
 def refresh_prices():
     db = SessionLocal()
     positions = db.query(Position).all()
+    price = trader.fetch_price()
+    if price is None:
+        db.close()
+        return {"status": "price_unavailable"}
 
     for pos in positions:
-        price = trader.fetch_price()
         pos.current_price = price
         pos.unrealized_pnl = (price - pos.avg_price) * pos.quantity
 
     db.commit()
     db.close()
-    return {"message": "Prices refreshed"}
+    return {"status": "ok"}
 
 
 @app.post("/start")
