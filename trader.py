@@ -28,7 +28,6 @@ class PaperTrader:
     def __init__(self, strategy_name="random"):
         state = get_or_create_system_state()
 
-        self.symbol = DEFAULT_SYMBOL
         self.strategy_name = strategy_name
         self.strategy = AVAILABLE_STRATEGIES[strategy_name]()
         self.cash = state.cash_balance
@@ -182,23 +181,28 @@ class PaperTrader:
     # Manual Tick
     # --------------------------
     def run_tick(self):
-        price = self.fetch_price()
-        if not price:
-            return "Price fetch failed"
-
         db = SessionLocal()
-        position = db.query(Position).filter(Position.symbol == self.symbol).first()
+        symbols = db.query(Symbol).all()
         db.close()
+        if not symbols:
+            return "No symbols configured"
+        results = []
 
-        signal = self.strategy.generate_signal(price, position)
-
-        action = signal["action"]
-        quantity = signal["quantity"]
-
-        if action in ["BUY", "SELL"] and quantity > 0:
-            result = self.execute_order(action, quantity, price)
-        else:
-            result = "No Trade"
-
+        for s in symbols:
+            self.symbol = s.name
+            price = self.fetch_price()
+            if not price:
+                continue
+            db = SessionLocal()
+            position = db.query(Position).filter(Position.symbol == self.symbol).first()
+            db.close()
+            signal = self.strategy.generate_signal(price, position, self.symbol)
+            action = signal["action"]
+            quantity = signal["quantity"]
+            if action in ["BUY", "SELL"] and quantity > 0:
+                result = self.execute_order(action, quantity, price)
+            else:
+                result = "HOLD"
+            results.append(f"{self.symbol}: {result}")
         self.update_equity()
-        return result
+        return results

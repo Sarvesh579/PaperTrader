@@ -25,21 +25,22 @@ class RandomStrategy(BaseStrategy):
 # -----------------------------------
 class MomentumStrategy(BaseStrategy):
     def __init__(self):
-        self.last_price = None
+        self.last_price = {}  # symbol -> last price
 
-    def generate_signal(self, price, position):
-        if self.last_price is None:
-            self.last_price = price
+    def generate_signal(self, price, position, symbol=None):
+
+        if symbol not in self.last_price:
+            self.last_price[symbol] = price
             return {"action": "HOLD", "quantity": 0}
 
-        if price > self.last_price:
+        if price > self.last_price[symbol]:
             signal = {"action": "BUY", "quantity": 10}
-        elif price < self.last_price:
+        elif price < self.last_price[symbol]:
             signal = {"action": "SELL", "quantity": 10}
         else:
             signal = {"action": "HOLD", "quantity": 0}
 
-        self.last_price = price
+        self.last_price[symbol] = price
         return signal
 
 # -----------------------------------

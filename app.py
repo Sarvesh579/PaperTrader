@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from trader import PaperTrader
 from scheduler import scheduler, start_scheduler, stop_scheduler, update_interval
-from db import SessionLocal, SystemState, Position, Trade, EquityHistory
+from db import SessionLocal, SystemState, Position, Trade, EquityHistory, Symbol
 from config import INITIAL_CAPITAL
 from datetime import datetime, timedelta
 from sqlalchemy import and_
@@ -30,11 +30,19 @@ initial_strategy = state.current_strategy if state else "random"
 trader = PaperTrader(initial_strategy)
 
 @app.on_event("startup")
-def resume_if_running():
+def initialize_system():
     db = SessionLocal()
+
+    # Ensure at least one symbol exists
+    if not db.query(Symbol).first():
+        db.add(Symbol(name="RELIANCE.NS"))
+        db.commit()
+
     state = db.query(SystemState).first()
+
     db.close()
 
+    # Resume scheduler if it was running
     if state and state.is_running:
         start_scheduler(trader)
 
@@ -163,6 +171,31 @@ def refresh_prices():
     return {"status": "ok"}
 
 
+@app.get("/symbols")
+def get_symbols():
+    db = SessionLocal()
+    symbols = db.query(Symbol).all()
+    db.close()
+
+    return [s.name for s in symbols]
+
+
+@app.post("/add_symbol/{symbol}")
+def add_symbol(symbol: str):
+    db = SessionLocal()
+
+    exists = db.query(Symbol).filter(Symbol.name == symbol).first()
+    if exists:
+        db.close()
+        return {"message": "Symbol already exists"}
+
+    db.add(Symbol(name=symbol))
+    db.commit()
+    db.close()
+
+    return {"message": f"{symbol} added"}
+
+
 @app.post("/start")
 def start():
     start_scheduler(trader)
@@ -235,3 +268,13 @@ def set_interval(minutes: int):
 def stop():
     stop_scheduler()
     return {"message": "Trading stopped"}
+
+
+@app.delete("/remove_symbol/{symbol}")
+def remove_symbol(symbol: str):
+    db = SessionLocal()
+    db.query(Symbol).filter(Symbol.name == symbol).delete()
+    db.commit()
+    db.close()
+
+    return {"message": f"{symbol} removed"}

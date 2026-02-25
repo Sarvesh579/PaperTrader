@@ -10,6 +10,15 @@ SessionLocal = sessionmaker(bind=engine)
 
 Base = declarative_base()
 
+# --------------------------
+# Symbols Table
+# --------------------------
+class Symbol(Base):
+    __tablename__ = "symbols"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String, unique=True, nullable=False)
+
 
 # -------------------------
 # Trades Table
